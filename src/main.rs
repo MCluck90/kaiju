@@ -1,15 +1,17 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{error::Error, io};
 
-use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers,
-};
+use app::App;
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
+
+mod app;
+mod ui;
 
 fn run() -> Result<(), Box<dyn Error>> {
     // Setup terminal
@@ -19,24 +21,23 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+    terminal.hide_cursor()?;
 
-    let tick_rate = Duration::from_millis(250);
-    let mut last_tick = Instant::now();
+    let mut app = App::new();
     loop {
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-        if crossterm::event::poll(timeout)? {
+        terminal.draw(|f| ui::draw(f, &mut app))?;
+
+        if crossterm::event::poll(Duration::MAX)? {
             if let Event::Key(key) = event::read()? {
-                match (key.code, key.modifiers.contains(KeyModifiers::CONTROL)) {
-                    (KeyCode::Char('q'), _) | (KeyCode::Char('c'), true) => break,
+                match key.code {
+                    KeyCode::Char(c) => app.on_key(c, key.modifiers),
                     _ => {}
                 }
             }
         }
 
-        if last_tick.elapsed() >= tick_rate {
-            last_tick = Instant::now();
+        if app.should_quit {
+            break;
         }
     }
 
