@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::{error::Error, io};
 
-use app::App;
+use app::{App, ArrowKey};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -31,6 +31,11 @@ fn run() -> Result<(), Box<dyn Error>> {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char(c) => app.on_key(c, key.modifiers),
+                    KeyCode::Up => app.on_arrow_key(ArrowKey::Up),
+                    KeyCode::Down => app.on_arrow_key(ArrowKey::Down),
+                    KeyCode::Left => app.on_arrow_key(ArrowKey::Left),
+                    KeyCode::Right => app.on_arrow_key(ArrowKey::Right),
+                    KeyCode::Enter => app.on_enter(),
                     _ => {}
                 }
             }

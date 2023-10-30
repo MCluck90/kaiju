@@ -13,8 +13,8 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .favorites
         .items
         .iter()
-        .map(|i| {
-            let lines = vec![Spans::from(i.clone())];
+        .map(|project| {
+            let lines = vec![Spans::from(project.name.clone())];
             ListItem::new(lines)
         })
         .collect();
@@ -23,7 +23,8 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title("Favorites"))
         .highlight_style(
             Style::default()
-                .bg(Color::Green)
+                .fg(Color::Black)
+                .bg(Color::LightGreen)
                 .add_modifier(Modifier::BOLD),
         );
 
