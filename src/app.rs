@@ -1,4 +1,6 @@
-use std::{path::PathBuf, process::Command};
+use home::home_dir;
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::BufReader, path::PathBuf, process::Command};
 
 use crossterm::event::KeyModifiers;
 use tui::widgets::ListState;
@@ -9,20 +11,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> App {
+    pub fn new(config_path: PathBuf) -> App {
+        let config = AppConfig::load(config_path);
+        let favorites = StatefulList::with_items(config.projects);
         let mut app = App {
             should_quit: false,
-            favorites: StatefulList::with_items(vec![
-                ProjectEntry::new("kaiju", PathBuf::from("/home/mike/code/cli/kaiju")),
-                ProjectEntry::new(
-                    "typescript",
-                    PathBuf::from("/home/mike/code/microsoft/typescript"),
-                ),
-                ProjectEntry::new(
-                    "web-lang",
-                    PathBuf::from("/home/mike/code/MCluck90/web-lang"),
-                ),
-            ]),
+            favorites,
         };
         app.favorites.next(); // Auto-highlight the first one
         app
@@ -52,8 +46,16 @@ impl App {
     pub fn on_enter(&mut self) {
         if let Some(selected_index) = self.favorites.state.selected() {
             let selected = self.favorites.items.get(selected_index).unwrap();
+            let mut home = home_dir().unwrap();
+            let path = if selected.path.starts_with("~") {
+                let path = selected.path.clone();
+                home.push(path.strip_prefix("~").unwrap());
+                &home
+            } else {
+                &selected.path
+            };
             let _ = Command::new("code")
-                .args([selected.path.to_str().unwrap()])
+                .args([path.to_str().unwrap()])
                 .spawn()
                 .unwrap();
             self.should_quit = true;
@@ -61,18 +63,38 @@ impl App {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct AppConfig {
+    pub projects: Vec<ProjectEntry>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            projects: Vec::new(),
+        }
+    }
+}
+
+impl AppConfig {
+    pub fn load(config_path: PathBuf) -> AppConfig {
+        let file = match File::open(config_path) {
+            Ok(file) => file,
+            Err(e) => {
+                println!("{:?}", e);
+                return AppConfig::default();
+            }
+        };
+        let reader = BufReader::new(file);
+
+        serde_json::from_reader(reader).unwrap_or_else(|_| AppConfig::default())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct ProjectEntry {
     pub name: String,
     pub path: PathBuf,
-}
-
-impl ProjectEntry {
-    pub fn new(name: &str, path: PathBuf) -> Self {
-        Self {
-            name: name.into(),
-            path,
-        }
-    }
 }
 
 pub struct StatefulList<T> {
@@ -89,6 +111,10 @@ impl<T> StatefulList<T> {
     }
 
     fn next(&mut self) {
+        if self.items.len() == 0 {
+            return;
+        }
+
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
@@ -103,6 +129,10 @@ impl<T> StatefulList<T> {
     }
 
     fn prev(&mut self) {
+        if self.items.len() == 0 {
+            return;
+        }
+
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {

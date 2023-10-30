@@ -7,6 +7,7 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
+use home::home_dir;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
@@ -14,6 +15,14 @@ mod app;
 mod ui;
 
 fn run() -> Result<(), Box<dyn Error>> {
+    let config_path = home_dir()
+        .map(|path| {
+            let mut path = path.clone();
+            path.push(".config/kaiju.json");
+            path
+        })
+        .unwrap();
+
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -23,7 +32,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut terminal = Terminal::new(backend)?;
     terminal.hide_cursor()?;
 
-    let mut app = App::new();
+    let mut app = App::new(config_path);
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
